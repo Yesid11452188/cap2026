@@ -59,9 +59,17 @@ document.getElementById('titulo').textContent = BOOT.evento;
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function call(fn) {
   var args = Array.prototype.slice.call(arguments, 1);
-  return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args }) })
-    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .catch(function () { throw 'No hay conexión con el servidor. Revise su internet e intente de nuevo.'; })
+  var url = API_URL + '?fn=' + encodeURIComponent(fn) + '&args=' + encodeURIComponent(JSON.stringify(args)) + '&t=' + Date.now();
+  return fetch(url, { method: 'GET', redirect: 'follow', credentials: 'omit' })
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    })
+    .then(function (t) {
+      try { return JSON.parse(t); }
+      catch (e) { throw new Error('respuesta no válida: ' + t.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)); }
+    }, function (e) { throw e; })
+    .catch(function (e) { throw 'No hay conexión con el servidor. Intente de nuevo. (Detalle: ' + (e && e.message ? e.message : e) + ')'; })
     .then(function (r) { if (!r.ok) throw r.error; return r.data; });
 }
 function store(k, v) { try { if (v === undefined) return localStorage.getItem(k) || ''; localStorage.setItem(k, v); } catch (e) { return ''; } }

@@ -40,9 +40,11 @@
   .pill { display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; }
   .pill.si { background:var(--verde2); color:var(--verde); } .pill.no { background:var(--amar); color:#8a5a00; }
   a { color:var(--verde); }
+  #carga { position:fixed; top:0; left:0; right:0; background:#f2b705; color:#222; text-align:center; font-size:14px; padding:6px; display:none; z-index:9; }
 </style>
 </head>
 <body>
+<div id="carga">Cargando, un momento…</div>
 <header><h1 id="titulo"></h1><p id="sub"></p></header>
 <main id="app"><div class="card">Cargando…</div></main>
 
@@ -57,7 +59,10 @@ var app = document.getElementById('app');
 document.getElementById('titulo').textContent = BOOT.evento;
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+var PEND = 0;
+function carga(d) { PEND += d; document.getElementById('carga').style.display = PEND > 0 ? 'block' : 'none'; }
 function call(fn) {
+  carga(1);
   var args = Array.prototype.slice.call(arguments, 1);
   var url = API_URL + '?fn=' + encodeURIComponent(fn) + '&args=' + encodeURIComponent(JSON.stringify(args)) + '&t=' + Date.now();
   return fetch(url, { method: 'GET', redirect: 'follow', credentials: 'omit' })
@@ -70,7 +75,7 @@ function call(fn) {
       catch (e) { throw new Error('respuesta no válida: ' + t.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)); }
     }, function (e) { throw e; })
     .catch(function (e) { throw 'No hay conexión con el servidor. Intente de nuevo. (Detalle: ' + (e && e.message ? e.message : e) + ')'; })
-    .then(function (r) { if (!r.ok) throw r.error; return r.data; });
+    .then(function (r) { carga(-1); if (!r.ok) throw r.error; return r.data; }, function (e) { carga(-1); throw e; });
 }
 function store(k, v) { try { if (v === undefined) return localStorage.getItem(k) || ''; localStorage.setItem(k, v); } catch (e) { return ''; } }
 function msg(el, txt, ok) { el.innerHTML = txt ? '<div class="' + (ok ? 'ok' : 'err') + '">' + esc(txt) + '</div>' : ''; }
@@ -218,7 +223,7 @@ function pintarTablero(d) {
   var tot = d.grupos.reduce(function (a, g) { a.t += g.total; a.i += g.instalados; a.c += g.completos; return a; }, { t: 0, i: 0, c: 0 });
   var h = '<div class="card"><h2>Resumen</h2><p>Instalados: <b>' + tot.i + '</b> de ' + tot.t +
     ' · Evaluación completa (2 evaluadores): <b>' + tot.c + '</b> de ' + tot.t + '</p>' +
-    '<p class="muted">Actualizado ' + esc(d.hora) + '. Se actualiza solo cada minuto.</p>' +
+    '<p class="muted">Actualizado ' + esc(d.hora) + '. Se actualiza solo cada minuto. <a href="#" id="salir">Salir (olvidar PIN en este equipo)</a></p>' +
     '<label>Filtrar por sede</label><select id="fs"><option value="">Todas</option>' +
     unicos(d.grupos.map(function (g) { return g.sede; })).map(function (s) { return '<option>' + esc(s) + '</option>'; }).join('') + '</select></div>';
 
@@ -251,6 +256,7 @@ function pintarTablero(d) {
   fs.value = sel;
   function filtrar() { store('fsede', fs.value); app.querySelectorAll('tr[data-sede]').forEach(function (tr) { tr.style.display = !fs.value || tr.getAttribute('data-sede') === fs.value ? '' : 'none'; }); }
   fs.onchange = filtrar; filtrar();
+  document.getElementById('salir').onclick = function (e) { e.preventDefault(); store('pinA', ''); clearTimeout(TIMER); location.reload(); };
   document.getElementById('fr').oninput = function () {
     var v = this.value.toLowerCase();
     document.querySelectorAll('#tr tr').forEach(function (tr, i) { if (i) tr.style.display = tr.textContent.toLowerCase().indexOf(v) >= 0 ? '' : 'none'; });

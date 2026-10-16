@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ciencia al Parque 2026</title>
+<style>
+  :root { --verde:#1c5e4a; --verde2:#e8f2ee; --gris:#666; --rojo:#b3261e; --amar:#fff4d6; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Arial, Helvetica, sans-serif; color:#222; background:#f6f7f6; }
+  header { background:var(--verde); color:#fff; padding:14px 16px; }
+  header h1 { margin:0; font-size:20px; }
+  header p { margin:4px 0 0; font-size:13px; opacity:.85; }
+  main { max-width:900px; margin:0 auto; padding:16px; }
+  .card { background:#fff; border-radius:10px; padding:16px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  h2 { font-size:18px; margin:0 0 10px; color:var(--verde); }
+  h3 { font-size:15px; margin:16px 0 6px; color:var(--verde); }
+  label { display:block; font-size:14px; margin:10px 0 4px; font-weight:bold; }
+  input, textarea, select { width:100%; padding:11px; font-size:16px; border:1px solid #bbb; border-radius:8px; }
+  button { background:var(--verde); color:#fff; border:0; border-radius:8px; padding:12px 18px; font-size:16px; cursor:pointer; margin-top:12px; }
+  button.sec { background:#fff; color:var(--verde); border:1px solid var(--verde); }
+  button:disabled { opacity:.5; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > * { flex:1 1 200px; }
+  .muted { color:var(--gris); font-size:13px; }
+  .err { background:#fde8e7; color:var(--rojo); padding:10px; border-radius:8px; margin-top:10px; }
+  .ok { background:var(--verde2); color:var(--verde); padding:10px; border-radius:8px; margin-top:10px; }
+  .dato { margin:4px 0; display:flex; gap:8px; } .dato b { flex:0 0 82px; }
+  .crit { border-top:1px solid #eee; padding:10px 0; }
+  .crit p { margin:0 0 6px; font-size:14px; }
+  .escala { display:flex; gap:4px; }
+  .escala label { flex:1; margin:0; text-align:center; border:1px solid #bbb; border-radius:6px; padding:9px 0; font-weight:normal; cursor:pointer; }
+  .escala input { display:none; }
+  .escala input:checked + span { font-weight:bold; }
+  .escala label.sel { background:var(--verde); color:#fff; border-color:var(--verde); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:6px; border-bottom:1px solid #eee; vertical-align:top; }
+  th { background:var(--verde2); }
+  .tabla { overflow-x:auto; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; }
+  .pill.si { background:var(--verde2); color:var(--verde); } .pill.no { background:var(--amar); color:#8a5a00; }
+  a { color:var(--verde); }
+</style>
+</head>
+<body>
+<header><h1 id="titulo"></h1><p id="sub"></p></header>
+<main id="app"><div class="card">Cargando…</div></main>
+
+<script>
+// Dirección del servicio de datos (Apps Script). Si se crea una implementación nueva, cambie solo esta línea.
+var API_URL = 'https://script.google.com/macros/s/AKfycbwtnedcwSWQQqX-Vh4zZJegHh3t_YnYOV_5djDlIyWvXleFPHNcSHIUfGCJEzcT9WDb/exec';
+var QS = new URLSearchParams(location.search);
+var BOOT = { p: QS.get('p') || 'consulta', id: (QS.get('id') || '').toUpperCase(), evento: 'Ciencia al Parque 2026' };
+if (!/^P\d{3}$/.test(BOOT.id)) BOOT.id = '';
+document.title = BOOT.evento;
+var app = document.getElementById('app');
+document.getElementById('titulo').textContent = BOOT.evento;
+
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function call(fn) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args }) })
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .catch(function () { throw 'No hay conexión con el servidor. Revise su internet e intente de nuevo.'; })
+    .then(function (r) { if (!r.ok) throw r.error; return r.data; });
+}
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k) || ''; localStorage.setItem(k, v); } catch (e) { return ''; } }
+function msg(el, txt, ok) { el.innerHTML = txt ? '<div class="' + (ok ? 'ok' : 'err') + '">' + esc(txt) + '</div>' : ''; }
+
+function fichaPoster(x) {
+  return '<div class="dato"><b>Póster</b> ' + esc(x.id) + '</div>' +
+    '<div class="dato"><b>Título</b> ' + esc(x.titulo) + '</div>' +
+    '<div class="dato"><b>Área</b> ' + esc(x.area) + '</div>' +
+    '<div class="dato"><b>Ciudad</b> ' + esc(x.ciudad) + '</div>' +
+    '<div class="dato"><b>Sede</b> ' + esc(x.sede) + (x.lugar ? ' (' + esc(x.lugar) + ')' : '') + '</div>' +
+    '<div class="dato"><b>Día</b> ' + esc(x.dia) + '</div>' +
+    '<div class="dato"><b>Franja</b> ' + esc(x.franja) + '</div>' +
+    (x.maps ? '<div class="dato"><a href="' + esc(x.maps) + '" target="_blank">Ver ubicación en Google Maps</a></div>' : '');
+}
+
+/* ---------- Consulta pública ---------- */
+function vistaConsulta() {
+  document.getElementById('sub').textContent = 'Consulte dónde y cuándo se presenta su póster';
+  app.innerHTML = '<div class="card"><h2>Buscar póster</h2>' +
+    '<label for="q">Nombre de un autor o título del póster</label>' +
+    '<input id="q" placeholder="Ejemplo: María Pérez o energía solar">' +
+    '<button id="b">Buscar</button><div id="m"></div></div><div id="res"></div>';
+  var q = document.getElementById('q'), m = document.getElementById('m'), res = document.getElementById('res');
+  function go() {
+    msg(m, ''); res.innerHTML = '';
+    if (q.value.trim().length < 3) return msg(m, 'Escriba al menos 3 letras.');
+    document.getElementById('b').disabled = true;
+    call('buscar', q.value).then(function (l) {
+      document.getElementById('b').disabled = false;
+      if (!l.length) return msg(m, 'No encontramos resultados. Pruebe con otro nombre o parte del título.');
+      res.innerHTML = l.map(function (x) { return '<div class="card">' + fichaPoster(x) + '</div>'; }).join('');
+    }).catch(function (e) { document.getElementById('b').disabled = false; msg(m, e); });
+  }
+  document.getElementById('b').onclick = go;
+  q.onkeydown = function (e) { if (e.key === 'Enter') go(); };
+}
+
+/* ---------- Página del póster (QR) ---------- */
+function vistaPoster() {
+  document.getElementById('sub').textContent = 'Póster ' + BOOT.id;
+  call('getPoster', BOOT.id).then(function (x) {
+    app.innerHTML = '<div class="card">' + fichaPoster(x) +
+      '<div class="dato"><b>Instalado</b> ' + (x.instalado ? '<span class="pill si">Sí, ' + esc(x.instalado) + '</span>' : '<span class="pill no">Pendiente</span>') + '</div></div>' +
+      '<div class="card"><h2>¿Quién es usted?</h2><div class="row">' +
+      '<button id="bm" class="sec">Soy monitor: marcar instalado</button>' +
+      (x.evaluacionAbierta ? '<button id="be">Soy evaluador: evaluar</button>' : '<p class="muted">La evaluación está cerrada.</p>') +
+      '</div></div><div id="zona"></div>';
+    document.getElementById('bm').onclick = function () { formInstalar(x); };
+    if (x.evaluacionAbierta) document.getElementById('be').onclick = function () { formCedula(x); };
+  }).catch(function (e) { app.innerHTML = '<div class="card"><div class="err">' + esc(e) + '</div></div>'; });
+}
+
+function formInstalar(x) {
+  var z = document.getElementById('zona');
+  z.innerHTML = '<div class="card"><h2>Marcar póster instalado</h2>' +
+    '<label>Su nombre</label><input id="nom" value="' + esc(store('monitor')) + '">' +
+    '<label>PIN de monitor</label><input id="pin" type="password" inputmode="numeric" value="' + esc(store('pinM')) + '">' +
+    '<label>Observación (opcional)</label><input id="obs">' +
+    '<button id="ok">Confirmar instalación</button><div id="m"></div></div>';
+  document.getElementById('ok').onclick = function () {
+    var b = this, m = document.getElementById('m'), nom = document.getElementById('nom').value, pin = document.getElementById('pin').value;
+    if (!nom.trim()) return msg(m, 'Escriba su nombre.');
+    b.disabled = true;
+    call('registrarInstalacion', x.id, pin, nom, document.getElementById('obs').value).then(function (r) {
+      store('monitor', nom); store('pinM', pin);
+      msg(m, r.ya ? 'Este póster ya estaba marcado como instalado (' + r.fecha + ').' : 'Listo, póster ' + x.id + ' marcado como instalado.', true);
+    }).catch(function (e) { b.disabled = false; msg(m, e); });
+  };
+  z.scrollIntoView();
+}
+
+function formCedula(x) {
+  var z = document.getElementById('zona');
+  z.innerHTML = '<div class="card"><h2>Evaluar póster ' + esc(x.id) + '</h2>' +
+    '<label>Número de cédula</label><input id="ced" inputmode="numeric" value="' + esc(store('ced')) + '">' +
+    '<button id="ok">Continuar</button><div id="m"></div></div>';
+  document.getElementById('ok').onclick = function () {
+    var b = this, m = document.getElementById('m'), ced = document.getElementById('ced').value;
+    b.disabled = true;
+    call('validarEvaluador', x.id, ced).then(function (r) { store('ced', ced); formEvaluar(x, ced, r); })
+      .catch(function (e) { b.disabled = false; msg(m, e); });
+  };
+  z.scrollIntoView();
+}
+
+function formEvaluar(x, ced, r) {
+  var z = document.getElementById('zona'), h = '', grupo = '';
+  h += '<div class="card"><h2>Evaluación del póster ' + esc(x.id) + '</h2>' +
+       '<p>Evaluador: <b>' + esc(r.nombre) + '</b> (' + esc(r.tipo) + ')</p>' +
+       '<p class="muted">Califique cada criterio de 1 (muy en desacuerdo) a 7 (muy de acuerdo).</p>';
+  r.criterios.forEach(function (c, i) {
+    if (c.grupo !== grupo) { grupo = c.grupo; h += '<h3>' + esc(grupo) + '</h3>'; }
+    h += '<div class="crit"><p><b>' + esc(c.n) + '. ' + esc(c.nombre) + '.</b> ' + esc(c.pregunta) + '</p><div class="escala">';
+    for (var v = 1; v <= 7; v++) h += '<label><input type="radio" name="c' + i + '" value="' + v + '"><span>' + v + '</span></label>';
+    h += '</div></div>';
+  });
+  h += '<label>Aportes y recomendaciones para los autores</label><textarea id="ap" rows="4"></textarea>' +
+       '<button id="env">Enviar evaluación</button><div id="m"></div></div>';
+  z.innerHTML = h;
+  z.querySelectorAll('.escala input').forEach(function (inp) {
+    inp.onchange = function () {
+      inp.closest('.escala').querySelectorAll('label').forEach(function (l) { l.classList.remove('sel'); });
+      inp.parentNode.classList.add('sel');
+    };
+  });
+  document.getElementById('env').onclick = function () {
+    var b = this, m = document.getElementById('m'), notas = [];
+    for (var i = 0; i < r.criterios.length; i++) {
+      var s = z.querySelector('input[name="c' + i + '"]:checked');
+      if (!s) return msg(m, 'Falta calificar el criterio ' + (i + 1) + '.');
+      notas.push(Number(s.value));
+    }
+    b.disabled = true;
+    call('guardarEvaluacion', x.id, ced, notas, document.getElementById('ap').value).then(function (t) {
+      z.innerHTML = '<div class="card"><h2>¡Gracias!</h2><div class="ok">Evaluación del póster ' + esc(x.id) + ' registrada.</div>' +
+        '<p>Calidad técnica: <b>' + t.tecnica + '</b> / 10<br>Creatividad y comunicación: <b>' + t.creatividad + '</b> / 10<br>Total: <b>' + t.total + '</b> / 10</p></div>';
+      z.scrollIntoView();
+    }).catch(function (e) { b.disabled = false; msg(m, e); });
+  };
+}
+
+/* ---------- Tablero en vivo ---------- */
+var PIN_ADMIN = '', TIMER = null;
+function vistaTablero() {
+  document.getElementById('sub').textContent = 'Tablero en vivo';
+  PIN_ADMIN = store('pinA');
+  if (PIN_ADMIN) return cargarTablero();
+  app.innerHTML = '<div class="card"><h2>Tablero en vivo</h2><label>PIN de administrador</label>' +
+    '<input id="pin" type="password" inputmode="numeric"><button id="ok">Entrar</button><div id="m"></div></div>';
+  document.getElementById('ok').onclick = function () { PIN_ADMIN = document.getElementById('pin').value; cargarTablero(); };
+}
+
+function cargarTablero() {
+  call('tablero', PIN_ADMIN).then(function (d) {
+    store('pinA', PIN_ADMIN);
+    pintarTablero(d);
+    clearTimeout(TIMER); TIMER = setTimeout(cargarTablero, 60000);
+  }).catch(function (e) {
+    store('pinA', '');
+    app.innerHTML = '<div class="card"><div class="err">' + esc(e) + '</div><button onclick="location.reload()">Volver</button></div>';
+  });
+}
+
+function pintarTablero(d) {
+  var tot = d.grupos.reduce(function (a, g) { a.t += g.total; a.i += g.instalados; a.c += g.completos; return a; }, { t: 0, i: 0, c: 0 });
+  var h = '<div class="card"><h2>Resumen</h2><p>Instalados: <b>' + tot.i + '</b> de ' + tot.t +
+    ' · Evaluación completa (2 evaluadores): <b>' + tot.c + '</b> de ' + tot.t + '</p>' +
+    '<p class="muted">Actualizado ' + esc(d.hora) + '. Se actualiza solo cada minuto.</p>' +
+    '<label>Filtrar por sede</label><select id="fs"><option value="">Todas</option>' +
+    unicos(d.grupos.map(function (g) { return g.sede; })).map(function (s) { return '<option>' + esc(s) + '</option>'; }).join('') + '</select></div>';
+
+  h += '<div class="card"><h2>Por sede y franja</h2><div class="tabla"><table><tr><th>Sede</th><th>Día</th><th>Franja</th><th>Pósters</th><th>Instalados</th><th>Completos</th><th>Con 1 evaluación</th><th>Sin evaluar</th></tr>' +
+    d.grupos.map(function (g) { return '<tr data-sede="' + esc(g.sede) + '"><td>' + esc(g.sede) + '</td><td>' + esc(g.dia) + '</td><td>' + esc(g.franja) + '</td><td>' + g.total + '</td><td>' + g.instalados + '</td><td>' + g.completos + '</td><td>' + g.parciales + '</td><td>' + g.sinEval + '</td></tr>'; }).join('') +
+    '</table></div></div>';
+
+  h += '<div class="card"><h2>Evaluaciones pendientes (' + d.pendientes.length + ')</h2><div class="tabla"><table><tr><th>Póster</th><th>Sede / franja</th><th>Instalado</th><th>Falta evaluar</th></tr>' +
+    d.pendientes.map(function (p) { return '<tr data-sede="' + esc(p.sede) + '"><td><b>' + esc(p.id) + '</b><br><span class="muted">' + esc(p.titulo) + '</span></td><td>' + esc(p.sede) + '<br>' + esc(p.dia) + ' ' + esc(p.franja) + '</td><td>' + (p.instalado ? '<span class="pill si">Sí</span>' : '<span class="pill no">No</span>') + '</td><td>' + p.faltan.map(esc).join('<br>') + '</td></tr>'; }).join('') +
+    '</table></div></div>';
+
+  h += '<div class="card"><h2>Evaluadores sin ninguna evaluación registrada (' + d.sinActividad.length + ')</h2><p class="muted">Pueden estar ausentes o aún no han empezado su franja.</p><div class="tabla"><table><tr><th>Evaluador</th><th>Cédula</th><th>Sede / franja</th><th>Pósters</th></tr>' +
+    d.sinActividad.map(function (e) { return '<tr data-sede="' + esc(e.sede) + '"><td>' + esc(e.nombre) + '</td><td>' + esc(e.cedula) + '</td><td>' + esc(e.sede) + '<br>' + esc(e.dia) + ' ' + esc(e.franja) + '</td><td>' + e.posters.map(esc).join(', ') + '</td></tr>'; }).join('') +
+    '</table></div></div>';
+
+  h += '<div class="card"><h2>Registrar reemplazo</h2>' +
+    '<div class="row"><div><label>Póster</label><input id="rp" placeholder="P001"></div>' +
+    '<div><label>Cédula del evaluador ausente</label><input id="ra" inputmode="numeric"></div></div>' +
+    '<div class="row"><div><label>Cédula del reemplazo</label><input id="rc" inputmode="numeric"></div>' +
+    '<div><label>Autorizado por</label><input id="rq" value="' + esc(store('coord')) + '"></div></div>' +
+    '<button id="rb">Registrar reemplazo</button><div id="rm"></div></div>';
+
+  h += '<div class="card"><h2>Evaluadores de reserva (' + d.reserva.length + ')</h2><label>Filtrar por disponibilidad o área</label><input id="fr" placeholder="Ejemplo: viernes, Santander, Ingeniería"><div class="tabla"><table id="tr"><tr><th>Nombre</th><th>Cédula</th><th>Disponibilidad</th><th>Áreas</th><th>Estado</th></tr>' +
+    d.reserva.map(function (e) { return '<tr><td>' + esc(e.nombre) + '<br><span class="muted">' + esc(e.institucion) + '</span></td><td>' + esc(e.cedula) + '</td><td>' + esc(e.disponibilidad) + '</td><td>' + esc(e.areas) + '</td><td>' + (e.usado ? '<span class="pill no">Ya reemplazó</span>' : '<span class="pill si">Libre</span>') + '</td></tr>'; }).join('') +
+    '</table></div></div>';
+
+  var sel = store('fsede');
+  app.innerHTML = h;
+  var fs = document.getElementById('fs');
+  fs.value = sel;
+  function filtrar() { store('fsede', fs.value); app.querySelectorAll('tr[data-sede]').forEach(function (tr) { tr.style.display = !fs.value || tr.getAttribute('data-sede') === fs.value ? '' : 'none'; }); }
+  fs.onchange = filtrar; filtrar();
+  document.getElementById('fr').oninput = function () {
+    var v = this.value.toLowerCase();
+    document.querySelectorAll('#tr tr').forEach(function (tr, i) { if (i) tr.style.display = tr.textContent.toLowerCase().indexOf(v) >= 0 ? '' : 'none'; });
+  };
+  document.getElementById('rb').onclick = function () {
+    var b = this, m = document.getElementById('rm'), q = document.getElementById('rq').value;
+    if (!q.trim()) return msg(m, 'Escriba quién autoriza.');
+    b.disabled = true; clearTimeout(TIMER);
+    call('asignarReemplazo', PIN_ADMIN, document.getElementById('rp').value.trim().toUpperCase(), document.getElementById('ra').value, document.getElementById('rc').value, q)
+      .then(function (r) { store('coord', q); msg(m, 'Reemplazo registrado: ' + r.nombre + ' ya puede evaluar con su cédula.', true); b.disabled = false; TIMER = setTimeout(cargarTablero, 5000); })
+      .catch(function (e) { b.disabled = false; msg(m, e); TIMER = setTimeout(cargarTablero, 60000); });
+  };
+}
+function unicos(a) { return a.filter(function (x, i) { return x && a.indexOf(x) === i; }); }
+
+if (BOOT.p === 'poster' && BOOT.id) vistaPoster();
+else if (BOOT.p === 'tablero') vistaTablero();
+else vistaConsulta();
+</script>
+</body>
+</html>

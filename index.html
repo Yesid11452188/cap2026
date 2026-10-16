@@ -33,6 +33,8 @@
   .escala input { display:none; }
   .escala input:checked + span { font-weight:bold; }
   .escala label.sel { background:var(--verde); color:#fff; border-color:var(--verde); }
+  .pts { display:flex; align-items:center; gap:8px; } .pts input { width:110px; } .pts span { color:var(--gris); }
+  .total { font-size:18px; margin:14px 0 4px; padding:10px; background:var(--verde2); border-radius:8px; color:var(--verde); }
   table { width:100%; border-collapse:collapse; font-size:13px; }
   th, td { text-align:left; padding:6px; border-bottom:1px solid #eee; vertical-align:top; }
   th { background:var(--verde2); }
@@ -162,36 +164,37 @@ function formCedula(x) {
 }
 
 function formEvaluar(x, ced, r) {
-  var z = document.getElementById('zona'), h = '', grupo = '';
+  var z = document.getElementById('zona'), h = '';
   h += '<div class="card"><h2>Evaluación del póster ' + esc(x.id) + '</h2>' +
        '<p>Evaluador: <b>' + esc(r.nombre) + '</b> (' + esc(r.tipo) + ')</p>' +
-       '<p class="muted">Califique cada criterio de 1 (muy en desacuerdo) a 7 (muy de acuerdo).</p>';
+       '<p class="muted">Asigne a cada criterio un puntaje entero entre 0 y su máximo. El total es sobre 100 puntos.</p>';
   r.criterios.forEach(function (c, i) {
-    if (c.grupo !== grupo) { grupo = c.grupo; h += '<h3>' + esc(grupo) + '</h3>'; }
-    h += '<div class="crit"><p><b>' + esc(c.n) + '. ' + esc(c.nombre) + '.</b> ' + esc(c.pregunta) + '</p><div class="escala">';
-    for (var v = 1; v <= 7; v++) h += '<label><input type="radio" name="c' + i + '" value="' + v + '"><span>' + v + '</span></label>';
-    h += '</div></div>';
+    h += '<div class="crit"><p><b>' + esc(c.n) + '. ' + esc(c.nombre) + '</b> (máximo ' + c.max + ' puntos). ' + esc(c.pregunta) + '</p>' +
+         '<div class="pts"><input type="number" id="c' + i + '" min="0" max="' + c.max + '" step="1" inputmode="numeric" placeholder="0 a ' + c.max + '"><span>/ ' + c.max + '</span></div></div>';
   });
-  h += '<label>Aportes y recomendaciones para los autores</label><textarea id="ap" rows="4"></textarea>' +
+  h += '<div class="total">Total: <b id="tot">0</b> / 100</div>' +
+       '<label>Aportes y recomendaciones para los autores</label><textarea id="ap" rows="4"></textarea>' +
        '<button id="env">Enviar evaluación</button><div id="m"></div></div>';
   z.innerHTML = h;
-  z.querySelectorAll('.escala input').forEach(function (inp) {
-    inp.onchange = function () {
-      inp.closest('.escala').querySelectorAll('label').forEach(function (l) { l.classList.remove('sel'); });
-      inp.parentNode.classList.add('sel');
-    };
-  });
+  function sumar() {
+    var t = 0;
+    r.criterios.forEach(function (c, i) { var v = Number(document.getElementById('c' + i).value); if (v >= 0 && v <= c.max) t += v; });
+    document.getElementById('tot').textContent = t;
+  }
+  r.criterios.forEach(function (c, i) { document.getElementById('c' + i).oninput = sumar; });
   document.getElementById('env').onclick = function () {
     var b = this, m = document.getElementById('m'), notas = [];
     for (var i = 0; i < r.criterios.length; i++) {
-      var s = z.querySelector('input[name="c' + i + '"]:checked');
-      if (!s) return msg(m, 'Falta calificar el criterio ' + (i + 1) + '.');
-      notas.push(Number(s.value));
+      var c = r.criterios[i], v = document.getElementById('c' + i).value.trim(), n = Number(v);
+      if (v === '' || !(n >= 0 && n <= c.max) || Math.floor(n) !== n) return msg(m, 'Revise el criterio ' + c.n + ': debe ser un número entero de 0 a ' + c.max + '.');
+      notas.push(n);
     }
+    var t = notas.reduce(function (a, n) { return a + n; }, 0);
+    if (!confirm('¿Enviar la evaluación del póster ' + x.id + ' con un total de ' + t + ' / 100? Después no se puede cambiar.')) return;
     b.disabled = true;
-    call('guardarEvaluacion', x.id, ced, notas, document.getElementById('ap').value).then(function (t) {
+    call('guardarEvaluacion', x.id, ced, notas, document.getElementById('ap').value).then(function (res) {
       z.innerHTML = '<div class="card"><h2>¡Gracias!</h2><div class="ok">Evaluación del póster ' + esc(x.id) + ' registrada.</div>' +
-        '<p>Calidad técnica: <b>' + t.tecnica + '</b> / 10<br>Creatividad y comunicación: <b>' + t.creatividad + '</b> / 10<br>Total: <b>' + t.total + '</b> / 10</p></div>';
+        '<p>Total: <b>' + res.total + '</b> / 100</p></div>';
       z.scrollIntoView();
     }).catch(function (e) { b.disabled = false; msg(m, e); });
   };

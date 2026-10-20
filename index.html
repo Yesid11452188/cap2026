@@ -247,6 +247,9 @@ function pintarTablero(d) {
     '<div><label>Cédula del evaluador ausente</label><input id="ra" inputmode="numeric"></div></div>' +
     '<div class="row"><div><label>Cédula del reemplazo</label><input id="rc" inputmode="numeric"></div>' +
     '<div><label>Autorizado por</label><input id="rq" value="' + esc(store('coord')) + '"></div></div>' +
+    '<p class="muted">Puede ser alguien de reserva o un evaluador que ya terminó. Si es un profesor que no está inscrito, escriba también su nombre y su institución.</p>' +
+    '<div class="row"><div><label>Nombre (solo si no está inscrito)</label><input id="rn"></div>' +
+    '<div><label>Institución (solo si no está inscrito)</label><input id="ri"></div></div>' +
     '<button id="rb">Registrar reemplazo</button><div id="rm"></div></div>';
 
   h += '<div class="card"><h2>Evaluadores de reserva (' + d.reserva.length + ')</h2><label>Filtrar por disponibilidad o área</label><input id="fr" placeholder="Ejemplo: viernes, Santander, Ingeniería"><div class="tabla"><table id="tr"><tr><th>Nombre</th><th>Cédula</th><th>Disponibilidad</th><th>Áreas</th><th>Estado</th></tr>' +
@@ -268,8 +271,9 @@ function pintarTablero(d) {
     var b = this, m = document.getElementById('rm'), q = document.getElementById('rq').value;
     if (!q.trim()) return msg(m, 'Escriba quién autoriza.');
     b.disabled = true; clearTimeout(TIMER);
-    call('asignarReemplazo', PIN_ADMIN, document.getElementById('rp').value.trim().toUpperCase(), document.getElementById('ra').value, document.getElementById('rc').value, q)
-      .then(function (r) { store('coord', q); msg(m, 'Reemplazo registrado: ' + r.nombre + ' ya puede evaluar con su cédula.', true); b.disabled = false; TIMER = setTimeout(cargarTablero, 5000); })
+    call('asignarReemplazo', PIN_ADMIN, document.getElementById('rp').value.trim().toUpperCase(), document.getElementById('ra').value, document.getElementById('rc').value, q,
+      { nombre: document.getElementById('rn').value, institucion: document.getElementById('ri').value })
+      .then(function (r) { store('coord', q); msg(m, (r.inscrito ? 'Inscrito y registrado: ' : 'Reemplazo registrado: ') + r.nombre + ' ya puede evaluar con su cédula.', true); b.disabled = false; TIMER = setTimeout(cargarTablero, 5000); })
       .catch(function (e) { b.disabled = false; msg(m, e); TIMER = setTimeout(cargarTablero, 60000); });
   };
 }
